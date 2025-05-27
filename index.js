@@ -1,57 +1,45 @@
 require("dotenv").config();
 const express = require("express");
-const bodyParser = require("body-parser");
 const cors = require("cors");
-const nodemailer = require("nodemailer");
+const bodyParser = require("body-parser");
+
+const { Pool } = require("pg"); // Ajoute ça pour PostgreSQL
 
 const app = express();
-const port = process.env.PORT || 4000;
+const port = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(bodyParser.json());
 
-// Route POST pour recevoir le formulaire de contact
-app.post("/api/contact", async (req, res) => {
-  const { name, email, message } = req.body;
+const pool = new Pool({
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  password: process.env.DB_PASSWORD,
+  port: process.env.DB_PORT,
+});
 
-  // Vérifie que les champs sont remplis
-  if (!name || !email || !message) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Tous les champs sont requis" });
-  }
+// Route de test
+app.get("/", (req, res) => {
+  res.send("Hello depuis le backend !");
+});
 
-  // Crée un transporteur SMTP avec Nodemailer
-  const transporter = nodemailer.createTransport({
-    service: "Gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-
-  // Contenu de l'email
-  const mailOptions = {
-    from: email, // l'adresse de l'expéditeur
-    to: process.env.EMAIL_USER, // ton email pour recevoir le message
-    subject: "Nouveau message de contact",
-    text: `Nom: ${name}\nEmail: ${email}\nMessage: ${message}`,
-  };
-
+app.get("/api/products", async (req, res) => {
   try {
-    // Envoie l'email
-    await transporter.sendMail(mailOptions);
-    res
-      .status(200)
-      .json({ success: true, message: "Message envoyé avec succès !" });
+    const { rows } = await pool.query("SELECT * FROM products");
+    res.json(rows);
   } catch (error) {
-    console.error(error);
-    res
-      .status(500)
-      .json({ success: false, message: "Erreur lors de l'envoi du message." });
+    console.error(error); // Ajoute ça pour voir l’erreur
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 
+app.post("/api/contact", (req, res) => {
+  const { name, email, message } = req.body;
+  console.log("Message reçu :", { name, email, message });
+  res.status(200).json({ success: true, message: "Message bien reçu !" });
+});
+
 app.listen(port, () => {
-  console.log(`API running on http://localhost:${port}`);
+  console.log(`Serveur backend en écoute sur le port ${port}`);
 });
